@@ -1,8 +1,7 @@
-import { test, describe } from 'node:test';
+import { test, describe } from 'vitest';
 import assert from 'node:assert/strict';
-import { setup, stintsFor, duration, MIN, HOUR } from './helpers.js';
+import { setup, stintsFor, firstStint, duration, running, pending, open, rejects, MIN, HOUR } from './helpers.ts';
 
-const rejects = (fn, status, re) => assert.throws(fn, (e) => e.status === status && (!re || re.test(e.message)));
 
 describe('starting and stopping', () => {
   test('start then stop opens the notes window without recording a stint yet', () => {
@@ -11,17 +10,17 @@ describe('starting and stopping', () => {
     clock.advance(30 * MIN);
     timer.requestStop();
     assert.equal(timer.state.running, null);
-    assert.equal(timer.state.pending.stoppedAt - timer.state.pending.start, 30 * MIN);
+    assert.equal(pending(timer).stoppedAt - pending(timer).start, 30 * MIN);
     assert.equal(timer.state.stints.length, 0);
   });
 
   test('starting the running task again is a no-op', () => {
     const { timer, clock, a } = setup();
     timer.start(a.id);
-    const start = timer.state.running.start;
+    const start = running(timer).start;
     clock.advance(MIN);
     timer.start(a.id);
-    assert.equal(timer.state.running.start, start);
+    assert.equal(running(timer).start, start);
     assert.equal(timer.state.pending, null);
   });
 
@@ -36,19 +35,19 @@ describe('starting and stopping', () => {
     clock.advance(10 * MIN);
     timer.start(b.id);
     assert.equal(timer.state.running, null);
-    assert.equal(timer.state.pending.taskId, a.id);
-    assert.equal(timer.state.pending.thenStart, b.id);
+    assert.equal(pending(timer).taskId, a.id);
+    assert.equal(pending(timer).thenStart, b.id);
     rejects(() => timer.start(a.id), 409, /pending/);
 
     clock.advance(MIN);
     timer.resolvePending({ notes: '', dismissed: true });
-    assert.equal(timer.state.running.taskId, b.id);
-    assert.equal(timer.state.running.start, clock.now);
+    assert.equal(running(timer).taskId, b.id);
+    assert.equal(running(timer).start, clock.now);
   });
 });
 
 describe('notes window end-time rule', () => {
-  function stopped(opts) {
+  function stopped(opts?: { graceMs?: number }) {
     const ctx = setup(opts);
     ctx.timer.start(ctx.a.id);
     ctx.clock.advance(60 * MIN);
@@ -60,7 +59,7 @@ describe('notes window end-time rule', () => {
     const { timer, clock, a } = stopped();
     clock.advance(5 * MIN);
     timer.resolvePending({ notes: 'did things' });
-    const [st] = stintsFor(timer, a.id);
+    const st = firstStint(timer, a.id);
     assert.equal(duration(st), 65 * MIN);
     assert.equal(st.notes, 'did things');
   });
@@ -69,14 +68,14 @@ describe('notes window end-time rule', () => {
     const { timer, clock, a } = stopped();
     clock.advance(5 * MIN);
     timer.resolvePending({ notes: '   ' });
-    assert.equal(duration(stintsFor(timer, a.id)[0]), 60 * MIN);
+    assert.equal(duration(firstStint(timer, a.id)), 60 * MIN);
   });
 
   test('skipped: stint ends at the stop time and typed notes are discarded', () => {
     const { timer, clock, a } = stopped();
     clock.advance(5 * MIN);
     timer.resolvePending({ notes: 'typed', dismissed: true });
-    const [st] = stintsFor(timer, a.id);
+    const st = firstStint(timer, a.id);
     assert.equal(duration(st), 60 * MIN);
     assert.equal(st.notes, '');
   });
@@ -85,7 +84,7 @@ describe('notes window end-time rule', () => {
     const { timer, clock, a } = stopped();
     clock.advance(16 * MIN);
     timer.resolvePending({ notes: 'late' });
-    const [st] = stintsFor(timer, a.id);
+    const st = firstStint(timer, a.id);
     assert.equal(duration(st), 60 * MIN);
     assert.equal(st.notes, 'late');
   });
@@ -98,7 +97,7 @@ describe('notes window end-time rule', () => {
     clock.advance(1);
     assert.equal(timer.sweep(), true);
     assert.equal(timer.state.pending, null);
-    const [st] = stintsFor(timer, a.id);
+    const st = firstStint(timer, a.id);
     assert.equal(duration(st), 60 * MIN);
     assert.equal(st.notes, 'half written');
   });
@@ -107,7 +106,7 @@ describe('notes window end-time rule', () => {
     const { timer, clock, a } = setup();
     timer.start(a.id, { start: clock.now - 5 * MIN, notes: 'planned work' });
     timer.requestStop();
-    assert.equal(timer.state.pending.draft, 'planned work');
+    assert.equal(pending(timer).draft, 'planned work');
   });
 });
 
@@ -131,8 +130,8 @@ describe('sessions', () => {
     timer.start(a.id);
     clock.advance(10 * MIN);
     timer.closeSession(a.id);
-    assert.equal(timer.state.pending.action, 'closeSession');
-    assert.equal(timer.openSession(a.id).closedAt, null);
+    assert.equal(pending(timer).action, 'closeSession');
+    assert.equal(open(timer, a.id).closedAt, null);
     timer.resolvePending({ dismissed: true });
     assert.equal(timer.openSession(a.id), undefined);
     assert.ok(timer.state.sessions[0].closedAt);
@@ -141,10 +140,10 @@ describe('sessions', () => {
   test('a new stint after closing starts a fresh session', () => {
     const { timer, clock, a } = setup();
     timer.addManualStint(a.id, { start: clock.now - 2 * HOUR, end: clock.now - HOUR });
-    const first = timer.openSession(a.id);
+    const first = open(timer, a.id);
     timer.closeSession(a.id);
     timer.start(a.id);
-    assert.notEqual(timer.openSession(a.id).id, first.id);
+    assert.notEqual(open(timer, a.id).id, first.id);
   });
 
   test('closeSessions stops an overnight timer at the given time', () => {
@@ -152,20 +151,20 @@ describe('sessions', () => {
     timer.start(a.id);
     const start = clock.now;
     clock.advance(16 * HOUR); // left running overnight
-    const sid = timer.openSession(a.id).id;
+    const sid = open(timer, a.id).id;
     rejects(() => timer.closeSessions([sid]), 400, /running timer/);
     timer.closeSessions([sid], start + 2 * HOUR);
     assert.equal(timer.state.running, null);
-    assert.equal(duration(stintsFor(timer, a.id)[0]), 2 * HOUR);
-    assert.ok(timer.state.sessions.find((s) => s.id === sid).closedAt);
+    assert.equal(duration(firstStint(timer, a.id)), 2 * HOUR);
+    assert.ok(timer.state.sessions.find((s) => s.id === sid)?.closedAt);
   });
 
   test('closeSessions clamps the running end into [start, now]', () => {
     const { timer, clock, a } = setup();
     timer.start(a.id);
     clock.advance(HOUR);
-    timer.closeSessions([timer.openSession(a.id).id], clock.now + 5 * HOUR);
-    assert.equal(duration(stintsFor(timer, a.id)[0]), HOUR);
+    timer.closeSessions([open(timer, a.id).id], clock.now + 5 * HOUR);
+    assert.equal(duration(firstStint(timer, a.id)), HOUR);
   });
 
   test('closing an empty session just drops it', () => {
@@ -179,11 +178,11 @@ describe('sessions', () => {
     const { timer, clock, project, a, b } = setup();
     timer.addManualStint(a.id, { start: clock.now - HOUR, end: clock.now });
     timer.finishTask(a.id);
-    assert.equal(timer.task(a.id).status, 'finished');
+    assert.equal(timer.task(a.id)?.status, 'finished');
     assert.equal(timer.openSession(a.id), undefined);
     timer.finishProject(project.id);
-    assert.equal(timer.task(b.id).status, 'finished');
-    assert.equal(timer.project(project.id).status, 'finished');
+    assert.equal(timer.task(b.id)?.status, 'finished');
+    assert.equal(timer.project(project.id)?.status, 'finished');
     rejects(() => timer.start(b.id), 400);
   });
 
@@ -191,18 +190,18 @@ describe('sessions', () => {
     const { timer, project, a } = setup();
     timer.start(a.id);
     timer.finishProject(project.id);
-    assert.equal(timer.state.pending.action, 'finishProject');
-    assert.equal(timer.project(project.id).status, 'active');
+    assert.equal(pending(timer).action, 'finishProject');
+    assert.equal(timer.project(project.id)?.status, 'active');
     timer.resolvePending({ dismissed: true });
-    assert.equal(timer.project(project.id).status, 'finished');
+    assert.equal(timer.project(project.id)?.status, 'finished');
   });
 
   test('reopening a task in a finished project reopens the project', () => {
     const { timer, project, a } = setup();
     timer.finishProject(project.id);
     timer.reopenTask(a.id);
-    assert.equal(timer.project(project.id).status, 'active');
-    assert.equal(timer.task(a.id).status, 'active');
+    assert.equal(timer.project(project.id)?.status, 'active');
+    assert.equal(timer.task(a.id)?.status, 'active');
   });
 });
 
@@ -212,13 +211,13 @@ describe('+ Time', () => {
     const st = timer.addManualStint(a.id, { start: clock.now - HOUR, end: clock.now - 30 * MIN, notes: ' offline ' });
     assert.equal(st.manual, true);
     assert.equal(st.notes, 'offline');
-    assert.equal(st.sessionId, timer.openSession(a.id).id);
+    assert.equal(st.sessionId, open(timer, a.id).id);
   });
 
   test('rejects bad ranges, future time, and > 24 hours', () => {
     const { timer, clock, a } = setup();
     rejects(() => timer.addManualStint(a.id, { start: clock.now, end: clock.now }), 400, /after start/);
-    rejects(() => timer.addManualStint(a.id, { start: 'x', end: clock.now }), 400);
+    rejects(() => timer.addManualStint(a.id, { start: NaN, end: clock.now }), 400);
     rejects(() => timer.addManualStint(a.id, { start: clock.now, end: clock.now + 2 * MIN }), 400, /future/);
     rejects(() => timer.addManualStint(a.id, { start: clock.now - 25 * HOUR, end: clock.now }), 400, /24 hours/);
   });
@@ -240,7 +239,7 @@ describe('+ Time', () => {
   test('start timer from an earlier time', () => {
     const { timer, clock, a, b } = setup();
     timer.start(a.id, { start: clock.now - 20 * MIN });
-    assert.equal(timer.state.running.start, clock.now - 20 * MIN);
+    assert.equal(running(timer).start, clock.now - 20 * MIN);
     rejects(() => timer.start(b.id, { start: clock.now - 5 * MIN }), 409, /Stop the running timer/);
   });
 

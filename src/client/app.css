@@ -1,0 +1,29 @@
+/* Numbers that tick shouldn't change width. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* iOS zooms the page when focusing an input with text under 16px. */
+@media (max-width: 48em) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+.live-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--mantine-color-green-6);
+  animation: pulse 1.4s infinite;
+}
+@keyframes pulse {
+  50% { opacity: 0.3; }
+}
+
+.pre-wrap {
+  white-space: pre-wrap;
+}

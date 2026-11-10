@@ -1,6 +1,6 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { clock, hm, hours, esc, parseDuration, toCsv, dayKey, timeKey } from '../public/js/format.js';
+import { clock, hm, hours, parseDuration, toCsv, dayKey, timeKey, minutesOf, hhmmOf } from '../src/client/lib/format.ts';
 
 test('clock / hm / hours', () => {
   assert.equal(clock(0), '0:00:00');
@@ -9,11 +9,6 @@ test('clock / hm / hours', () => {
   assert.equal(clock(26 * 3600000), '26:00:00');
   assert.equal(hm(3725000), '1h 02m');
   assert.equal(hours(5400000), '1.50');
-});
-
-test('esc escapes HTML', () => {
-  assert.equal(esc(`<a href="x">'&'</a>`), '&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;');
-  assert.equal(esc(null), '');
 });
 
 test('parseDuration', () => {
@@ -34,4 +29,9 @@ test('dayKey / timeKey use local time', () => {
   const t = new Date(2026, 0, 5, 7, 3).getTime();
   assert.equal(dayKey(t), '2026-01-05');
   assert.equal(timeKey(t), '07:03');
+});
+
+test("minutesOf / hhmmOf", () => {
+  assert.equal(minutesOf("07:05"), 425);
+  assert.equal(hhmmOf(425), "07:05");
 });

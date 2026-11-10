@@ -1,24 +1,36 @@
-// The timer rules. Pure in-memory logic over a state object; no I/O.
-//
-// Terms:
-//   Project > Task > Session (a task's running total for the day, closed at end of day)
-//                  > Stint   (one start→stop period of work, with optional notes)
+// The timer rules. Pure in-memory logic over a State object; no I/O.
 import crypto from 'node:crypto';
+import type { State, Project, Task, Session, Stint, StopAction } from '../shared/types.ts';
 
 export const DEFAULT_GRACE_MS = 15 * 60 * 1000; // notes window before falling back to the stop time
 export const MAX_STINT_MS = 24 * 60 * 60 * 1000;
 
 export class HttpError extends Error {
-  constructor(status, message) {
+  status: 400 | 404 | 409;
+  constructor(status: 400 | 404 | 409, message: string) {
     super(message);
     this.status = status;
   }
 }
-const fail = (status, message) => { throw new HttpError(status, message); };
-const text = (v, max = 20000) => String(v ?? '').slice(0, max);
+const fail = (status: 400 | 404 | 409, message: string): never => { throw new HttpError(status, message); };
+const text = (v: unknown, max = 20000) => String(v ?? '').slice(0, max);
+
+export interface TimerOptions {
+  now?: () => number;
+  graceMs?: number;
+  newId?: () => string;
+}
+
+export interface StartOptions { start?: number | null; notes?: string }
+export interface StintInput { start: number; end: number; notes?: string }
 
 export class Timer {
-  constructor(state, { now = Date.now, graceMs = DEFAULT_GRACE_MS, newId = () => crypto.randomUUID() } = {}) {
+  state: State;
+  now: () => number;
+  graceMs: number;
+  newId: () => string;
+
+  constructor(state: State, { now = Date.now, graceMs = DEFAULT_GRACE_MS, newId = () => crypto.randomUUID() }: TimerOptions = {}) {
     this.state = state;
     this.now = now;
     this.graceMs = graceMs;
@@ -26,63 +38,63 @@ export class Timer {
   }
 
   // ----- lookups -----
-  project(pid) { return this.state.projects.find((p) => p.id === pid); }
-  task(tid) { return this.state.tasks.find((t) => t.id === tid); }
-  openSession(tid) { return this.state.sessions.find((s) => s.taskId === tid && !s.closedAt); }
-  isLive(tid) { return this.state.running?.taskId === tid || this.state.pending?.taskId === tid; }
+  project(pid: string): Project | undefined { return this.state.projects.find((p) => p.id === pid); }
+  task(tid: string): Task | undefined { return this.state.tasks.find((t) => t.id === tid); }
+  openSession(tid: string): Session | undefined { return this.state.sessions.find((s) => s.taskId === tid && !s.closedAt); }
+  isLive(tid: string): boolean { return this.state.running?.taskId === tid || this.state.pending?.taskId === tid; }
 
-  activeTask(tid) {
+  private activeTask(tid: string): Task {
     const task = this.task(tid);
-    if (!task || task.status !== 'active') fail(400, 'Task not found or not active');
+    if (!task || task.status !== 'active') return fail(400, 'Task not found or not active');
     const project = this.project(task.projectId);
     if (!project || project.status !== 'active') fail(400, 'Project is not active');
     return task;
   }
 
   // ----- projects & tasks -----
-  addProject(name) {
-    const p = { id: this.newId(), name: requireName(name), status: 'active', createdAt: this.now() };
+  addProject(name: string): Project {
+    const p: Project = { id: this.newId(), name: requireName(name), status: 'active', createdAt: this.now() };
     this.state.projects.push(p);
     return p;
   }
-  addTask(projectId, name) {
+  addTask(projectId: string, name: string): Task {
     const p = this.project(projectId);
     if (!p || p.status !== 'active') fail(400, 'Project not found or not active');
-    const t = { id: this.newId(), projectId, name: requireName(name), status: 'active', createdAt: this.now() };
+    const t: Task = { id: this.newId(), projectId, name: requireName(name), status: 'active', createdAt: this.now() };
     this.state.tasks.push(t);
     return t;
   }
-  finishTask(tid) {
+  finishTask(tid: string): void {
     if (this.state.running?.taskId === tid) return this.requestStop('finishTask');
     if (this.state.pending?.taskId === tid) fail(409, 'Finish the pending notes first');
     this._finishTask(tid);
   }
-  finishProject(pid) {
+  finishProject(pid: string): void {
     if (this.state.tasks.some((t) => t.projectId === pid && this.isLive(t.id))) {
       if (this.state.pending) fail(409, 'Finish the pending notes first');
       return this.requestStop('finishProject');
     }
     this._finishProject(pid);
   }
-  reopenProject(pid) {
+  reopenProject(pid: string): void {
     const p = this.project(pid) ?? fail(404, 'Project not found');
     p.status = 'active';
     delete p.finishedAt;
   }
-  reopenTask(tid) {
+  reopenTask(tid: string): void {
     const t = this.task(tid) ?? fail(404, 'Task not found');
     const p = this.project(t.projectId);
     if (p && p.status !== 'active') this.reopenProject(p.id);
     t.status = 'active';
     delete t.finishedAt;
   }
-  _finishTask(tid) {
+  private _finishTask(tid: string): void {
     const task = this.task(tid) ?? fail(404, 'Task not found');
     task.status = 'finished';
     task.finishedAt = this.now();
     this._closeSession(tid);
   }
-  _finishProject(pid) {
+  private _finishProject(pid: string): void {
     const project = this.project(pid) ?? fail(404, 'Project not found');
     project.status = 'finished';
     project.finishedAt = this.now();
@@ -90,7 +102,7 @@ export class Timer {
   }
 
   // ----- sessions -----
-  ensureOpenSession(tid, at = this.now()) {
+  ensureOpenSession(tid: string, at = this.now()): Session {
     let s = this.openSession(tid);
     if (!s) {
       s = { id: this.newId(), taskId: tid, openedAt: at, closedAt: null };
@@ -98,61 +110,61 @@ export class Timer {
     }
     return s;
   }
-  closeSession(tid) {
+  closeSession(tid: string): void {
     if (this.state.running?.taskId === tid) return this.requestStop('closeSession');
     if (this.state.pending?.taskId === tid) fail(409, 'Finish the pending notes first');
     this._closeSession(tid);
   }
-  _closeSession(tid) {
+  private _closeSession(tid: string): void {
     const s = this.openSession(tid);
     if (!s) return;
     if (this.state.stints.some((st) => st.sessionId === s.id)) s.closedAt = this.now();
     else this.state.sessions = this.state.sessions.filter((x) => x !== s); // nothing recorded — drop it
   }
-  // Close several sessions at once (end of day / next-morning reset).
-  // If one belongs to the running timer, it is stopped at `runningEnd` without the notes pop-up.
-  closeSessions(ids = [], runningEnd) {
+  /**
+   * Close several sessions at once (end of day / next-morning reset).
+   * If one belongs to the running timer, it is stopped at `runningEnd` without the notes pop-up.
+   */
+  closeSessions(ids: string[], runningEnd?: number | null): void {
     for (const sid of ids) {
       const s = this.state.sessions.find((x) => x.id === sid && !x.closedAt);
       if (!s) continue;
       if (this.state.pending?.taskId === s.taskId) fail(409, 'Finish the pending notes first');
       const r = this.state.running;
       if (r?.taskId === s.taskId) {
-        const end = Number(runningEnd);
-        if (runningEnd == null || !Number.isFinite(end)) fail(400, 'Choose when the running timer should stop');
-        this.addStint(r.taskId, r.start, Math.min(Math.max(end, r.start), this.now()), r.notes || '');
+        if (runningEnd == null || !Number.isFinite(runningEnd)) fail(400, 'Choose when the running timer should stop');
+        this.addStint(r.taskId, r.start, Math.min(Math.max(runningEnd!, r.start), this.now()), r.notes || '');
         this.state.running = null;
       }
       this._closeSession(s.taskId);
     }
   }
-  setDayCheck(day) { this.state.lastDayCheck = text(day, 20); }
+  setDayCheck(day: string): void { this.state.lastDayCheck = text(day, 20); }
 
   // ----- stints -----
-  addStint(taskId, start, end, notes = '', extra = {}) {
+  addStint(taskId: string, start: number, end: number, notes = '', extra: Partial<Stint> = {}): Stint {
     const sess = this.ensureOpenSession(taskId, start);
-    const st = { id: this.newId(), taskId, sessionId: sess.id, start, end, notes, ...extra };
+    const st: Stint = { id: this.newId(), taskId, sessionId: sess.id, start, end, notes, ...extra };
     this.state.stints.push(st);
     return st;
   }
-  // Does [start, end) overlap any recorded or in-progress stint?
-  overlaps(start, end) {
+  /** Does [start, end) overlap any recorded or in-progress stint? */
+  overlaps(start: number, end: number): boolean {
     const { stints, running, pending } = this.state;
-    const spans = stints.map((s) => [s.start, s.end]);
+    const spans: [number, number][] = stints.map((s) => [s.start, s.end]);
     if (running) spans.push([running.start, this.now()]);
     if (pending) spans.push([pending.start, pending.stoppedAt]);
     return spans.some(([a, b]) => start < b && end > a);
   }
-  addManualStint(taskId, { start, end, notes } = {}) {
+  addManualStint(taskId: string, { start, end, notes }: StintInput): Stint {
     this.activeTask(taskId);
-    start = Number(start); end = Number(end);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) fail(400, 'End must be after start');
     if (end > this.now() + 60000) fail(400, 'Can’t add time in the future');
     if (end - start > MAX_STINT_MS) fail(400, 'That’s more than 24 hours');
     if (this.overlaps(start, end)) fail(400, 'That overlaps time already recorded');
     return this.addStint(taskId, start, end, text(notes).trim(), { manual: true });
   }
-  deleteStint(stintId) {
+  deleteStint(stintId: string): void {
     const st = this.state.stints.find((s) => s.id === stintId) ?? fail(404, 'Stint not found');
     this.state.stints = this.state.stints.filter((s) => s !== st);
     const sess = this.state.sessions.find((s) => s.id === st.sessionId);
@@ -162,50 +174,51 @@ export class Timer {
   }
 
   // ----- the running timer -----
-  // Start a task. If another is running, stop it (notes pop-up) and start this one afterwards.
-  start(tid, { start, notes } = {}) {
+  /** Start a task. If another is running, stop it (notes pop-up) and start this one afterwards. */
+  start(tid: string, opts: StartOptions = {}): void {
     const { running, pending } = this.state;
     if (running?.taskId === tid) return;
     if (pending) fail(409, 'Finish the pending notes first');
     if (running) {
-      if (start != null) fail(409, 'Stop the running timer before starting one at a set time');
+      if (opts.start != null) fail(409, 'Stop the running timer before starting one at a set time');
       return this.requestStop('stop', tid);
     }
-    this._start(tid, { start, notes });
+    this._start(tid, opts);
   }
-  _start(tid, { start, notes } = {}) {
+  private _start(tid: string, { start, notes }: StartOptions = {}): void {
     this.activeTask(tid);
     if (this.state.running || this.state.pending) fail(409, 'Another timer is active');
     const t = this.now();
+    let from = t;
     if (start != null) {
-      start = Number(start);
       if (!Number.isFinite(start) || start > t + 60000) fail(400, 'Start time can’t be in the future');
-      start = Math.min(start, t);
-      if (t - start > MAX_STINT_MS) fail(400, 'Start time is more than 24 hours ago');
-      if (this.overlaps(start, t)) fail(400, 'That start time overlaps time already recorded');
-    } else start = t;
-    this.ensureOpenSession(tid, start);
-    this.state.running = { taskId: tid, start, notes: text(notes) };
+      from = Math.min(start, t);
+      if (t - from > MAX_STINT_MS) fail(400, 'Start time is more than 24 hours ago');
+      if (this.overlaps(from, t)) fail(400, 'That start time overlaps time already recorded');
+    }
+    this.ensureOpenSession(tid, from);
+    this.state.running = { taskId: tid, start: from, notes: text(notes) };
   }
 
-  // Stop the running timer and open the notes window.
-  // action: 'stop' | 'finishTask' | 'finishProject' | 'closeSession'; thenStart: task to start afterwards.
-  requestStop(action = 'stop', thenStart = null) {
+  /** Stop the running timer and open the notes window. */
+  requestStop(action: StopAction = 'stop', thenStart: string | null = null): void {
     const r = this.state.running;
     if (this.state.pending) fail(409, 'Notes for the previous stint are still pending');
-    if (!r) fail(409, 'No timer is running');
+    if (!r) return fail(409, 'No timer is running');
     this.state.pending = { taskId: r.taskId, start: r.start, stoppedAt: this.now(), action, thenStart, draft: r.notes || '' };
     this.state.running = null;
   }
-  saveDraft(notes) {
-    if (!this.state.pending) fail(409, 'Nothing pending');
-    this.state.pending.draft = text(notes);
+  saveDraft(notes: string): void {
+    const p = this.state.pending ?? fail(409, 'Nothing pending');
+    p.draft = text(notes);
   }
 
-  // Close the notes window and record the stint.
-  // End-time rule: notes written and saved within the grace window → the stint runs until saving
-  // (note-writing time counts). Empty, dismissed, or ignored past the window → it ends at the stop time.
-  resolvePending({ notes, dismissed = false, timedOut = false } = {}) {
+  /**
+   * Close the notes window and record the stint.
+   * End-time rule: notes written and saved within the grace window → the stint runs until saving
+   * (note-writing time counts). Empty, dismissed, or ignored past the window → it ends at the stop time.
+   */
+  resolvePending({ notes, dismissed = false, timedOut = false }: { notes?: string; dismissed?: boolean; timedOut?: boolean } = {}): void {
     const p = this.state.pending ?? fail(409, 'Nothing pending');
     const body = text(notes ?? p.draft).trim();
     const t = this.now();
@@ -223,8 +236,8 @@ export class Timer {
     }
   }
 
-  // Auto-close a notes window that has been ignored past the grace period. Returns true if it did.
-  sweep() {
+  /** Auto-close a notes window that has been ignored past the grace period. Returns true if it did. */
+  sweep(): boolean {
     const p = this.state.pending;
     if (!p || this.now() - p.stoppedAt <= this.graceMs) return false;
     this.resolvePending({ timedOut: true });
@@ -232,7 +245,7 @@ export class Timer {
   }
 }
 
-function requireName(v) {
+function requireName(v: unknown): string {
   const name = text(v, 200).trim();
   if (!name) fail(400, 'Name is required');
   return name;

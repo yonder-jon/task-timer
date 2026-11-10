@@ -1,9 +1,10 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadState, saveState, migrate, emptyState } from '../src/server/store.js';
+import { loadState, saveState, migrate, emptyState } from '../src/server/store.ts';
+import type { State } from '../src/shared/types.ts';
 
 const tmpFile = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'task-timer-')), 'data.json');
 
@@ -19,7 +20,7 @@ test('corrupt file is an error, not silently replaced', () => {
 
 test('save then load round-trips and leaves no temp file', () => {
   const f = tmpFile();
-  const s = { ...emptyState(), projects: [{ id: 'p', name: 'P', status: 'active' }] };
+  const s: State = { ...emptyState(), projects: [{ id: 'p', name: 'P', status: 'active', createdAt: 1 }] };
   saveState(f, s);
   assert.deepEqual(loadState(f), s);
   assert.equal(fs.existsSync(f + '.tmp'), false);
@@ -44,7 +45,7 @@ test('migrates v1 sessions into stints grouped per task per day', () => {
   assert.equal(s.stints.length, 4);
   assert.ok(s.stints.every((st) => st.sessionId));
 
-  const sessOf = (id) => s.sessions.find((x) => x.id === s.stints.find((st) => st.id === id).sessionId);
+  const sessOf = (id: string) => s.sessions.find((x) => x.id === s.stints.find((st) => st.id === id)?.sessionId)!;
   assert.equal(sessOf('s1'), sessOf('s2'), 'same task, same day → same session');
   assert.notEqual(sessOf('s1'), sessOf('s3'), 'different day → different session');
   assert.ok(sessOf('s1').closedAt, "yesterday's session is closed");
