@@ -3,12 +3,32 @@
 Simple local time tracker. Only one timer runs at a time.
 
 ```
-node server.js                       # http://localhost:3000
-HOST=<tailscale-ip> node server.js    # or bind to the Tailscale IP (or use `tailscale serve 3000`)
+npm start        # http://localhost:3000
+npm run dev      # same, restarts on server file changes
+npm test         # node:test, no dependencies
+HOST=<tailscale-ip> npm start   # bind to the Tailscale IP (or use `tailscale serve 3000`)
 ```
 
-No dependencies (Node 18+). Data is saved to `data.json` next to `server.js`, rewritten after every change.
+No dependencies and no build step (Node 20+). The browser loads `public/` as native ES modules.
+Data is saved to `data.json` in the project root, rewritten after every change.
 You can change this with the `PORT` / `HOST` / `DATA_FILE` environment variables.
+
+## Layout
+```
+src/server/
+  main.js      entry point: config, load data, start HTTP server
+  app.js       HTTP: API routes, static files, rollback on error
+  timer.js     the timer rules (Timer class): no I/O, clock injectable for tests
+  store.js     load/save data.json, format migrations
+public/
+  index.html, styles.css
+  js/main.js       rendering, event delegation (data-action / data-change / data-submit), tickers
+  js/state.js      client state, API calls, toast/clipboard/download
+  js/model.js      derived values (session/total times, live tickers)
+  js/format.js     pure formatting helpers
+  js/views/        dashboard, history, notes pop-up, + Time dialog, close-sessions dialog
+test/              timer rules, storage/migration, HTTP, formatting
+```
 
 ## Terms
 - **Project** contains **tasks**.
