@@ -20,5 +20,5 @@
     "noUnusedParameters": true,
     "skipLibCheck": true
   },
-  "include": ["src", "test", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src", "test", "vite.config.ts", "vitest.config.mts"]
 }
