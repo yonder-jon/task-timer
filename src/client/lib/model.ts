@@ -39,6 +39,10 @@ export const startOfDay = (t: number) => { const d = new Date(t); d.setHours(0, 
 /** Time only if it's today, otherwise with the date. */
 export const whenLabel = (t: number, now: number) => (dayKey(t) === dayKey(now) ? fmtTime(t) : `${fmtDate(t)} ${fmtTime(t)}`);
 
+/** A task's sessions closed today (oldest first): their totals still need entering on the platform. */
+export const closedTodaySessions = (s: State, tid: string, now: number) =>
+  s.sessions.filter((x) => x.taskId === tid && x.closedAt && x.closedAt >= startOfDay(now)).sort((a, b) => a.closedAt! - b.closedAt!);
+
 /** Sessions opened before today that are still open. */
 export const staleSessions = (s: State, now: number) => openSessions(s).filter((x) => x.openedAt < startOfDay(now));
 /** Should the next-day prompt be offered? */

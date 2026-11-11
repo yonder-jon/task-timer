@@ -3,7 +3,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { emptyState } from '../src/server/store.ts';
 import {
-  liveMs, sessionMs, taskSessionMs, taskTotalMs, projectSessionMs, sessionNotes, staleSessions, needsDayCheck,
+  closedTodaySessions, liveMs, sessionMs, taskSessionMs, taskTotalMs, projectSessionMs, sessionNotes, staleSessions, needsDayCheck,
 } from '../src/client/lib/model.ts';
 import { dayKey } from '../src/client/lib/format.ts';
 import type { State } from '../src/shared/types.ts';
@@ -74,4 +74,14 @@ test('next-day check: only when stale sessions exist, not already handled today,
   assert.equal(needsDayCheck({ ...s, sessions: s.sessions.filter((x) => x.id !== 'sb') }, now), false);
   const pending = { taskId: 'a', start: now - MIN, stoppedAt: now, action: 'stop' as const, thenStart: null, draft: '' };
   assert.equal(needsDayCheck({ ...s, running: null, pending }, now), false);
+});
+
+test('closedTodaySessions: only this task\'s sessions closed since midnight', () => {
+  const s = fixture();
+  s.sessions.push(
+    { id: 'c2', taskId: 'a', openedAt: now - 5 * HOUR, closedAt: now - HOUR },
+    { id: 'c1', taskId: 'a', openedAt: yesterday, closedAt: now - 6 * HOUR }, // yesterday's, closed this morning
+    { id: 'cb', taskId: 'b', openedAt: now - 5 * HOUR, closedAt: now - 4 * HOUR },
+  );
+  assert.deepEqual(closedTodaySessions(s, 'a', now).map((x) => x.id), ['c1', 'c2']);
 });

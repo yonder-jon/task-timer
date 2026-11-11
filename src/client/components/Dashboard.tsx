@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
-  ActionIcon, Box, Button, Card, Divider, Group, Menu, Paper, SimpleGrid, Stack, Text, TextInput, Title,
+  ActionIcon, Box, Button, Card, Divider, Group, Menu, Paper, SimpleGrid, Stack, Text, TextInput, Title, Tooltip,
 } from '@mantine/core';
-import { IconDots, IconPlayerPlayFilled, IconPlayerStopFilled, IconPlus } from '@tabler/icons-react';
+import { IconCopy, IconDots, IconPlayerPlayFilled, IconPlayerStopFilled, IconPlus } from '@tabler/icons-react';
 import type { Project, Task } from '../../shared/types.ts';
-import { api, serverNow, useAction, useS } from '../lib/api.ts';
+import { api, copyText, serverNow, useAction, useS } from '../lib/api.ts';
 import {
-  openSession, openSessions, openSessionsMs, project, projectSessionMs, projectTasks, projectTotalMs,
-  task, taskSessionMs, taskTotalMs, whenLabel,
+  closedTodaySessions, openSession, openSessions, openSessionsMs, project, projectSessionMs, projectTasks, projectTotalMs,
+  sessionMs, sessionNotes, task, taskSessionMs, taskTotalMs, whenLabel,
 } from '../lib/model.ts';
-import { clock, hm } from '../lib/format.ts';
+import { clock, dayKey, fmtDate, fmtTime, hm } from '../lib/format.ts';
 import { Live } from './Live.tsx';
 
 interface Props {
@@ -146,6 +146,33 @@ function ProjectCard({ project: p, onAddTime }: { project: Project; onAddTime: (
   );
 }
 
+/** Sessions closed today, so their totals can still be entered on the platform after closing. */
+function ClosedToday({ taskId }: { taskId: string }) {
+  const s = useS();
+  const now = serverNow();
+  const list = closedTodaySessions(s, taskId, now);
+  if (!list.length) return null;
+  return (
+    <Stack gap={0} mt={4}>
+      {list.map((x) => {
+        const notes = sessionNotes(s, x);
+        const opened = dayKey(x.openedAt) === dayKey(now) ? '' : ` · ${fmtDate(x.openedAt)}`;
+        return (
+          <Group key={x.id} gap={6} wrap="nowrap" justify="flex-end">
+            <Text size="sm" c="dimmed" className="num" truncate miw={0}>Closed {fmtTime(x.closedAt!)}{opened}</Text>
+            <Text size="sm" fw={700} className="num" style={{ whiteSpace: 'nowrap' }}>{clock(sessionMs(s, x, now))}</Text>
+            <Tooltip label={notes ? 'Copy notes' : 'No notes'}>
+              <ActionIcon size="sm" variant="subtle" color="gray" disabled={!notes} onClick={() => copyText(notes)} aria-label="Copy notes">
+                <IconCopy size={14} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        );
+      })}
+    </Stack>
+  );
+}
+
 function TaskRow({ task: t, onAddTime }: { task: Task; onAddTime: (taskId: string) => void }) {
   const s = useS();
   const run = useAction();
@@ -173,6 +200,7 @@ function TaskRow({ task: t, onAddTime }: { task: Task; onAddTime: (taskId: strin
           <Text size="xs" c="dimmed" className="num">total <Live>{(now) => clock(taskTotalMs(s, t.id, now))}</Live></Text>
         </Box>
       </Group>
+      <ClosedToday taskId={t.id} />
       <Group gap="xs" mt="xs" wrap="nowrap">
         {running ? (
           <Button size="xs" color="red" disabled={busy} leftSection={<IconPlayerStopFilled size={14} />} onClick={() => run(() => api.stop.$post())}>Stop</Button>
