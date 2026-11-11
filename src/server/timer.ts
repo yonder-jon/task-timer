@@ -22,7 +22,8 @@ export interface TimerOptions {
 }
 
 export interface StartOptions { start?: number | null; notes?: string }
-export interface StintInput { start: number; end: number; notes?: string }
+/** `session`: omitted/'current' = the task's open session, 'new' = a new closed (past) session, or a closed session's id. */
+export interface StintInput { start: number; end: number; notes?: string; session?: string }
 
 export class Timer {
   state: State;
@@ -156,13 +157,27 @@ export class Timer {
     if (pending) spans.push([pending.start, pending.stoppedAt]);
     return spans.some(([a, b]) => start < b && end > a);
   }
-  addManualStint(taskId: string, { start, end, notes }: StintInput): Stint {
+  addManualStint(taskId: string, { start, end, notes, session = 'current' }: StintInput): Stint {
     this.activeTask(taskId);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) fail(400, 'End must be after start');
     if (end > this.now() + 60000) fail(400, 'Can’t add time in the future');
     if (end - start > MAX_STINT_MS) fail(400, 'That’s more than 24 hours');
     if (this.overlaps(start, end)) fail(400, 'That overlaps time already recorded');
-    return this.addStint(taskId, start, end, text(notes).trim(), { manual: true });
+    const body = text(notes).trim();
+    if (session === 'current') return this.addStint(taskId, start, end, body, { manual: true });
+
+    let sess: Session;
+    if (session === 'new') {
+      sess = { id: this.newId(), taskId, openedAt: start, closedAt: end };
+      this.state.sessions.push(sess);
+    } else {
+      sess = this.state.sessions.find((x) => x.id === session && x.taskId === taskId && x.closedAt) ?? fail(404, 'Past session not found');
+      sess.openedAt = Math.min(sess.openedAt, start);
+      sess.closedAt = Math.max(sess.closedAt!, end);
+    }
+    const st: Stint = { id: this.newId(), taskId, sessionId: sess.id, start, end, notes: body, manual: true };
+    this.state.stints.push(st);
+    return st;
   }
   deleteStint(stintId: string): void {
     const st = this.state.stints.find((s) => s.id === stintId) ?? fail(404, 'Stint not found');

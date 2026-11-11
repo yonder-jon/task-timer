@@ -214,6 +214,29 @@ describe('+ Time', () => {
     assert.equal(st.sessionId, open(timer, a.id).id);
   });
 
+  test('adds a stint as a new past session, leaving the open session alone', () => {
+    const { timer, clock, a } = setup();
+    const cur = timer.addManualStint(a.id, { start: clock.now - HOUR, end: clock.now - 30 * MIN });
+    const st = timer.addManualStint(a.id, { start: clock.now - 26 * HOUR, end: clock.now - 25 * HOUR, session: 'new' });
+    const past = timer.state.sessions.find((x) => x.id === st.sessionId)!;
+    assert.notEqual(st.sessionId, cur.sessionId);
+    assert.deepEqual([past.openedAt, past.closedAt], [clock.now - 26 * HOUR, clock.now - 25 * HOUR]);
+    assert.equal(open(timer, a.id).id, cur.sessionId);
+  });
+
+  test('adds a stint to an existing past session of the same task only', () => {
+    const { timer, clock, a, b } = setup();
+    const first = timer.addManualStint(a.id, { start: clock.now - 26 * HOUR, end: clock.now - 25 * HOUR, session: 'new' });
+    const st = timer.addManualStint(a.id, { start: clock.now - 28 * HOUR, end: clock.now - 27 * HOUR, session: first.sessionId });
+    const past = timer.state.sessions.find((x) => x.id === first.sessionId)!;
+    assert.equal(st.sessionId, first.sessionId);
+    assert.deepEqual([past.openedAt, past.closedAt], [clock.now - 28 * HOUR, clock.now - 25 * HOUR]);
+    rejects(() => timer.addManualStint(b.id, { start: clock.now - 3 * HOUR, end: clock.now - 2 * HOUR, session: first.sessionId }), 404);
+    const cur = timer.addManualStint(a.id, { start: clock.now - HOUR, end: clock.now - 30 * MIN });
+    rejects(() => timer.addManualStint(a.id, { start: clock.now - 20 * MIN, end: clock.now - 10 * MIN, session: cur.sessionId }), 404);
+    rejects(() => timer.addManualStint(a.id, { start: clock.now - 25.5 * HOUR, end: clock.now - 24 * HOUR, session: 'new' }), 400, /overlaps/);
+  });
+
   test('rejects bad ranges, future time, and > 24 hours', () => {
     const { timer, clock, a } = setup();
     rejects(() => timer.addManualStint(a.id, { start: clock.now, end: clock.now }), 400, /after start/);

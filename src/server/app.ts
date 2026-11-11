@@ -21,7 +21,7 @@ export interface AppDeps {
 const name = z.object({ name: z.string() });
 const newTask = z.object({ projectId: z.string(), name: z.string() });
 const start = z.object({ start: z.number().nullish(), notes: z.string().optional() });
-const stint = z.object({ start: z.number(), end: z.number(), notes: z.string().optional() });
+const stint = z.object({ start: z.number(), end: z.number(), notes: z.string().optional(), session: z.string().optional() });
 const closeSessions = z.object({ ids: z.array(z.string()), runningEnd: z.number().nullish(), day: z.string().optional() });
 const day = z.object({ day: z.string() });
 const draft = z.object({ notes: z.string() });

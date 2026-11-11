@@ -54,7 +54,8 @@ test/                    timer rules, storage/migration, HTTP, client model, for
   - Skipped, saved empty, or ignored for 15 min: the stint ends when you stopped the timer.
     Anything you typed is still kept.
 - **+ Time** can do two things:
-  - Add a stint you worked without the timer (it goes into the task's current session).
+  - Add a stint you worked without the timer. It goes into the task's current session by default, or into
+    a new past session or an existing past one (these are already closed, so today's total is unaffected).
   - Start the timer from an earlier time today.
   - Either way, time can't overlap time already recorded.
 - **Next-day prompt:** on the first click or keypress of a new day, sessions left open from a previous day

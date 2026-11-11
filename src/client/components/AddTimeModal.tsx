@@ -1,11 +1,11 @@
 // "+ Time": add a completed stint, or start the timer from an earlier time today.
 import { useState } from 'react';
-import { Alert, Button, Group, Modal, SimpleGrid, Tabs, Text, TextInput, Textarea } from '@mantine/core';
+import { Alert, Button, Group, Modal, Select, SimpleGrid, Tabs, Text, TextInput, Textarea } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { api, serverNow, toast, useAction, useS } from '../lib/api.ts';
-import { project, task } from '../lib/model.ts';
-import { dayKey, fromLocal, hhmmOf, hm, minutesOf, parseDuration, timeKey } from '../lib/format.ts';
+import { openSession, project, sessionMs, task, taskSessionMs } from '../lib/model.ts';
+import { dayKey, fmtDate, fromLocal, hhmmOf, hm, minutesOf, parseDuration, timeKey } from '../lib/format.ts';
 
 const warn = (message: string) => notifications.show({ color: 'red', message });
 
@@ -36,7 +36,9 @@ function AddTimeForm({ taskId, onDone }: { taskId: string; onDone: () => void })
 }
 
 function AddStint({ taskId, onDone }: { taskId: string; onDone: () => void }) {
+  const s = useS();
   const run = useAction();
+  const [session, setSession] = useState<string>('current');
   const [initial] = useState(() => {
     const end = Math.floor(serverNow() / 60000) * 60000;
     return { date: dayKey(end), from: timeKey(end - 30 * 60000), to: timeKey(end) };
@@ -60,19 +62,37 @@ function AddStint({ taskId, onDone }: { taskId: string; onDone: () => void }) {
     if (m != null && from && minutesOf(from) + m < 24 * 60) setTo(hhmmOf(minutesOf(from) + m));
   };
 
+  // Which session the stint goes into: the open one, a new past one, or an existing past one.
+  const now = serverNow();
+  const past = s.sessions.filter((x) => x.taskId === taskId && x.closedAt).sort((a, b) => b.openedAt - a.openedAt);
+  const sessionOptions = [
+    { value: 'current', label: `Current session (${openSession(s, taskId) ? hm(taskSessionMs(s, taskId, now)) : 'new'})` },
+    { value: 'new', label: 'New past session' },
+    ...past.map((x) => ({ value: x.id, label: `Past: ${fmtDate(x.openedAt)} (${hm(sessionMs(s, x, now))})` })),
+  ];
+  const onSession = (v: string | null) => {
+    const next = v ?? 'current';
+    setSession(next);
+    const sess = past.find((x) => x.id === next);
+    if (sess) setDate(dayKey(sess.openedAt)); // most likely the same day
+    else if (next === 'new' && date === dayKey(now)) setDate(dayKey(now - 86400000)); // most likely yesterday or earlier
+  };
+
   const submit = async () => {
     if (!date || !from || !to) return warn('Fill in the date and times');
     const start = fromLocal(date, from), end = fromLocal(date, to);
     if (end <= start) return warn('“To” must be after “From”');
-    if (await run(() => api.tasks[':id'].stints.$post({ param: { id: taskId }, json: { start, end, notes } }))) {
-      toast(`Added ${hm(end - start)}`);
+    if (await run(() => api.tasks[':id'].stints.$post({ param: { id: taskId }, json: { start, end, notes, session } }))) {
+      toast(session === 'current' ? `Added ${hm(end - start)}` : `Added ${hm(end - start)} to a past session`);
       onDone();
     }
   };
 
   return (
     <>
-      <Text size="sm" c="dimmed" mb="sm">Record time you worked without the timer. It's added to this task's current session.</Text>
+      <Text size="sm" c="dimmed" mb="sm">Record time you worked without the timer.</Text>
+      <Select mb="sm" label="Add to" allowDeselect={false} data={sessionOptions} value={session} onChange={onSession}
+        description={session === 'current' ? 'Counts towards the session you’re working on now.' : 'Kept in History as a closed session; today’s session is unaffected.'} />
       <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
         <TextInput label="Date" type="date" value={date} max={dayKey(serverNow())} onChange={(e) => setDate(e.currentTarget.value)} />
         <TextInput label="From" type="time" value={from} onChange={(e) => onFrom(e.currentTarget.value)} />
