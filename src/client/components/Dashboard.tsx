@@ -12,6 +12,7 @@ import {
 } from '../lib/model.ts';
 import { clock, dayKey, fmtDate, fmtTime, hm } from '../lib/format.ts';
 import { Live } from './Live.tsx';
+import { RenameModal } from './RenameModal.tsx';
 
 interface Props {
   onAddTime: (taskId: string) => void;
@@ -105,6 +106,7 @@ function ProjectCard({ project: p, onAddTime }: { project: Project; onAddTime: (
   const s = useS();
   const run = useAction();
   const [name, setName] = useState('');
+  const [renaming, setRenaming] = useState(false);
   const tasks = projectTasks(s, p.id).filter((t) => t.status === 'active');
   const isLive = tasks.some((t) => s.running?.taskId === t.id);
   const addTask = async (e: FormEvent) => {
@@ -128,10 +130,13 @@ function ProjectCard({ project: p, onAddTime }: { project: Project; onAddTime: (
             <ActionIcon variant="subtle" color="gray" aria-label="Project actions"><IconDots size={18} /></ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>
+            <Menu.Item onClick={() => setRenaming(true)}>Rename…</Menu.Item>
             <Menu.Item disabled={!!s.pending} onClick={finish}>Finish project</Menu.Item>
           </Menu.Dropdown>
         </Menu>
       </Group>
+      <RenameModal opened={renaming} title="Rename project" name={p.name} onClose={() => setRenaming(false)}
+        onSave={async (n) => !!(await run(() => api.projects[':id'].rename.$post({ param: { id: p.id }, json: { name: n } })))} />
       <Divider />
       {tasks.length
         ? tasks.map((t) => <TaskRow key={t.id} task={t} onAddTime={onAddTime} />)
@@ -179,6 +184,7 @@ function TaskRow({ task: t, onAddTime }: { task: Task; onAddTime: (taskId: strin
   const running = s.running?.taskId === t.id;
   const busy = !!s.pending;
   const id = { param: { id: t.id } };
+  const [renaming, setRenaming] = useState(false);
 
   const closeSession = () => {
     if (confirm(`Close the session for "${t.name}" at ${hm(taskSessionMs(s, t.id, serverNow()))}? The session counter resets to 0:00.`)) {
@@ -212,14 +218,17 @@ function TaskRow({ task: t, onAddTime }: { task: Task; onAddTime: (taskId: strin
         <Box style={{ flex: 1 }} />
         <Menu position="bottom-end" withinPortal>
           <Menu.Target>
-            <ActionIcon variant="subtle" color="gray" disabled={busy} aria-label="Task actions"><IconDots size={18} /></ActionIcon>
+            <ActionIcon variant="subtle" color="gray" aria-label="Task actions"><IconDots size={18} /></ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>
-            <Menu.Item disabled={!openSession(s, t.id)} onClick={closeSession}>Close session</Menu.Item>
-            <Menu.Item onClick={finish}>Finish task</Menu.Item>
+            <Menu.Item onClick={() => setRenaming(true)}>Rename…</Menu.Item>
+            <Menu.Item disabled={busy || !openSession(s, t.id)} onClick={closeSession}>Close session</Menu.Item>
+            <Menu.Item disabled={busy} onClick={finish}>Finish task</Menu.Item>
           </Menu.Dropdown>
         </Menu>
       </Group>
+      <RenameModal opened={renaming} title="Rename task" name={t.name} onClose={() => setRenaming(false)}
+        onSave={async (n) => !!(await run(() => api.tasks[':id'].rename.$post({ ...id, json: { name: n } })))} />
     </Box>
   );
 }

@@ -205,6 +205,31 @@ describe('sessions', () => {
   });
 });
 
+describe('renaming', () => {
+  test('renames tasks and projects, trimming, keeping their time', () => {
+    const { timer, clock, project, a } = setup();
+    timer.addManualStint(a.id, { start: clock.now - HOUR, end: clock.now });
+    timer.renameTask(a.id, '  Real task name ');
+    timer.renameProject(project.id, 'Renamed project');
+    assert.equal(timer.task(a.id)?.name, 'Real task name');
+    assert.equal(timer.project(project.id)?.name, 'Renamed project');
+    assert.equal(stintsFor(timer, a.id).length, 1);
+  });
+
+  test('works while the timer runs and on finished tasks; rejects blank names and unknown ids', () => {
+    const { timer, a, b } = setup();
+    timer.start(a.id);
+    timer.renameTask(a.id, 'Running one');
+    assert.equal(running(timer).taskId, a.id);
+    timer.finishTask(b.id);
+    timer.renameTask(b.id, 'Finished one');
+    assert.equal(timer.task(b.id)?.name, 'Finished one');
+    rejects(() => timer.renameTask(a.id, '   '), 400, /required/);
+    rejects(() => timer.renameTask('nope', 'x'), 404);
+    rejects(() => timer.renameProject('nope', 'x'), 404);
+  });
+});
+
 describe('+ Time', () => {
   test('adds a manual stint to the open session', () => {
     const { timer, clock, a } = setup();

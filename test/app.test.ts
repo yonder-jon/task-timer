@@ -58,6 +58,18 @@ test('full start → stop → notes flow, saving after each change', async () =>
   assert.equal(saves, 5);
 });
 
+test('rename routes update the name and save', async () => {
+  const p = timer.addProject('P');
+  const t = timer.addTask(p.id, 'first task - tbd');
+  let s = await json(await post(`/api/tasks/${t.id}/rename`, { name: 'Defined task' }));
+  assert.equal(s.tasks[0]?.name, 'Defined task');
+  s = await json(await post(`/api/projects/${p.id}/rename`, { name: 'Q' }));
+  assert.equal(s.projects[0]?.name, 'Q');
+  assert.equal(saves, 2);
+  assert.equal((await post(`/api/tasks/${t.id}/rename`, { name: '' })).status, 400);
+  assert.equal((await post(`/api/tasks/${t.id}/rename`, {})).status, 400);
+});
+
 test('rule errors return status, message and current state', async () => {
   const res = await post('/api/stop');
   assert.equal(res.status, 409);

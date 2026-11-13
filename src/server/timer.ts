@@ -65,6 +65,12 @@ export class Timer {
     this.state.tasks.push(t);
     return t;
   }
+  renameProject(pid: string, name: string): void {
+    (this.project(pid) ?? fail(404, 'Project not found')).name = requireName(name);
+  }
+  renameTask(tid: string, name: string): void {
+    (this.task(tid) ?? fail(404, 'Task not found')).name = requireName(name);
+  }
   finishTask(tid: string): void {
     if (this.state.running?.taskId === tid) return this.requestStop('finishTask');
     if (this.state.pending?.taskId === tid) fail(409, 'Finish the pending notes first');
