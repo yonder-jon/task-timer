@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 // HTTP layer: the JSON API (Hono + zod) and, in production, the built client.
 import { Hono } from 'hono';
 import type { Context } from 'hono';

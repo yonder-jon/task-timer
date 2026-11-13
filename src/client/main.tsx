@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import './app.css';

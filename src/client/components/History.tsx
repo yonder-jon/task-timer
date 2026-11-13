@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 import { Fragment, useState } from 'react';
 import {
   ActionIcon, Badge, Button, Collapse, Group, Menu, Paper, Select, Stack, Table, Text, Title, Tooltip,

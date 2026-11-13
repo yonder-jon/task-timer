@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 // The notes pop-up shown whenever a running timer stops (driven by state.pending).
 import { useEffect, useRef, useState } from 'react';
 import { Button, Group, Modal, Text, Textarea } from '@mantine/core';

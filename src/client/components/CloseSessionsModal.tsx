@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 // Close several sessions at once: the manual "End day…" dialog, and the next-morning prompt
 // for sessions left open from a previous day.
 import { useState } from 'react';

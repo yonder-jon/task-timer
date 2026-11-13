@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 // Entry point: `npm start` (build + serve) or `npm run dev`.
 import fs from 'node:fs';
 import path from 'node:path';

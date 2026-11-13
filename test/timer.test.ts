@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 import { test, describe } from 'vitest';
 import assert from 'node:assert/strict';
 import { setup, stintsFor, firstStint, duration, running, pending, open, rejects, MIN, HOUR } from './helpers.ts';

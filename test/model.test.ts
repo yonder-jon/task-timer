@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 // Client-side derived values (session/total times, the next-day check).
 import { test } from 'vitest';
 import assert from 'node:assert/strict';

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 import assert from 'node:assert/strict';
 import { Timer, HttpError } from '../src/server/timer.ts';
 import { emptyState } from '../src/server/store.ts';

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {

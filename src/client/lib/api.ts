@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 // Talking to the server: typed client (Hono RPC), the state query, and a helper for actions.
 import { useCallback, useSyncExternalStore } from 'react';
 import { hc } from 'hono/client';

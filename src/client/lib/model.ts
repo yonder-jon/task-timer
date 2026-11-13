@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 // Derived values. Pure functions of (state, now) so they're easy to test.
 import type { State, Session, Stint } from '../../shared/types.ts';
 import { dayKey, fmtDate, fmtTime } from './format.ts';

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 // "+ Time": add a completed stint, or start the timer from an earlier time today.
 import { useState } from 'react';
 import { Alert, Button, Group, Modal, Select, SimpleGrid, Tabs, Text, TextInput, Textarea } from '@mantine/core';

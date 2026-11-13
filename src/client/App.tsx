@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 import { useEffect, useRef, useState } from 'react';
 import { AppShell, Center, Container, Loader, Text } from '@mantine/core';
 import { useAppState, serverNow } from './lib/api.ts';

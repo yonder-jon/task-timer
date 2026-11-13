@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 // The timer rules. Pure in-memory logic over a State object; no I/O.
 import crypto from 'node:crypto';
 import type { State, Project, Task, Session, Stint, StopAction } from '../shared/types.ts';

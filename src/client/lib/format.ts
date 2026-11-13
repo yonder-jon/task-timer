@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 // Pure formatting helpers.
 
 export const pad = (n: number) => String(n).padStart(2, '0');

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 import { useEffect } from 'react';
 import { ActionIcon, Group, SegmentedControl, Text, Title, Tooltip, useMatches } from '@mantine/core';
 import { IconClockHour4, IconPlayerStopFilled } from '@tabler/icons-react';

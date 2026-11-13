@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 // Persistence: load / save the whole state as one JSON file, plus format migrations.
 import fs from 'node:fs';
 import crypto from 'node:crypto';

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2026 Jon Gill
+
 // HTTP-level tests: routing, validation, persistence on change, rollback on error, static files.
 import { test, beforeEach, beforeAll } from 'vitest';
 import assert from 'node:assert/strict';

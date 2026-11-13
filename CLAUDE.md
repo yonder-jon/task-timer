@@ -63,3 +63,5 @@ accessors like `running`/`pending`/`open`, and `rejects(fn, status, /msg/)` for 
 - The app is reached from a phone over Tailscale (`tailscale serve` → :3000, or :5173 for live dev; Vite
   allows `.ts.net` hosts). Layouts must work at phone width (≈375px) without horizontal scroll.
 - Dependency versions are pinned exactly in `package.json`.
+- Licensed BSD-2-Clause (`LICENCE.md`). Every source file starts with
+  `// SPDX-License-Identifier: BSD-2-Clause` and `// Copyright (c) 2026 Jon Gill`; add both to new files.
