@@ -149,7 +149,7 @@ function SessionRows({ session: x, open, onToggle, onDelete }: RowProps) {
           </ActionIcon>
         </Table.Td>
         <Table.Td style={{ whiteSpace: 'nowrap' }}>
-          {fmtDate(x.openedAt)} {!x.closedAt && <Badge size="xs" color="green" variant="light">open</Badge>}
+          {fmtDate(x.openedAt)} {!x.closedAt && <Badge component="span" size="xs" color="green" variant="light">open</Badge>}
         </Table.Td>
         <Table.Td>{project(s, t.projectId)?.name}</Table.Td>
         <Table.Td>{t.name}</Table.Td>
@@ -162,7 +162,7 @@ function SessionRows({ session: x, open, onToggle, onDelete }: RowProps) {
         <Table.Tr key={st.id} bg="var(--mantine-color-default-hover)">
           <Table.Td />
           <Table.Td colSpan={3} className="num" fz="sm">
-            {whenLabel(st.start, serverNow())} – {fmtTime(st.end)} {st.manual && <Badge size="xs" variant="light">added</Badge>}
+            {whenLabel(st.start, serverNow())} – {fmtTime(st.end)} {st.manual && <Badge component="span" size="xs" variant="light">added</Badge>}
           </Table.Td>
           <Table.Td className="num" fz="sm">{clock(st.end - st.start)}</Table.Td>
           <Table.Td />
@@ -188,7 +188,7 @@ function SessionCard({ session: x, open, onToggle, onDelete }: RowProps) {
       <Group gap="sm" wrap="nowrap" align="flex-start">
         <div style={{ flex: 1, minWidth: 0 }}>
           <Text size="xs" c="dimmed">
-            {fmtDate(x.openedAt)} {!x.closedAt && <Badge size="xs" color="green" variant="light">open</Badge>}
+            {fmtDate(x.openedAt)} {!x.closedAt && <Badge component="span" size="xs" color="green" variant="light">open</Badge>}
           </Text>
           <Text size="sm" c="dimmed" truncate>{project(s, t.projectId)?.name}</Text>
           <Text fw={600} style={{ overflowWrap: 'anywhere' }}>{t.name}</Text>
@@ -215,7 +215,7 @@ function SessionCard({ session: x, open, onToggle, onDelete }: RowProps) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <Text size="sm" className="num">
                   {whenLabel(st.start, serverNow())} – {fmtTime(st.end)} · <b>{clock(st.end - st.start)}</b>{' '}
-                  {st.manual && <Badge size="xs" variant="light">added</Badge>}
+                  {st.manual && <Badge component="span" size="xs" variant="light">added</Badge>}
                 </Text>
                 {st.notes && <Text size="sm" c="dimmed" className="pre-wrap">{st.notes}</Text>}
               </div>

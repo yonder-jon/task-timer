@@ -253,8 +253,8 @@ function TaskRow({ task: t, onAddTime }: { task: Task; onAddTime: (taskId: strin
   return (
     <Box px="md" py="sm" bg={running ? 'var(--mantine-color-green-light)' : undefined} style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
       <Group gap="sm" wrap="nowrap" align="flex-start">
-        <Text fw={500} c={ended ? 'dimmed' : undefined} style={{ flex: 1, overflowWrap: 'anywhere' }}>
-          {t.name}{ended && <> <Badge size="sm" variant="light" color="gray" style={{ verticalAlign: 'middle' }}>Ended</Badge></>}
+        <Text component="div" fw={500} c={ended ? 'dimmed' : undefined} style={{ flex: 1, overflowWrap: 'anywhere' }}>
+          {t.name}{ended && <> <Badge component="span" size="sm" variant="light" color="gray" style={{ verticalAlign: 'middle' }}>Ended</Badge></>}
         </Text>
         <Box ta="right">
           <Text fz="xl" fw={700} lh={1.1} c={running ? 'green' : ended ? 'dimmed' : undefined} className="num" title="Current session">
