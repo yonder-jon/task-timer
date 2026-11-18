@@ -6,7 +6,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { emptyState } from '../src/server/store.ts';
 import {
-  closedTodaySessions, liveMs, sessionMs, taskSessionMs, taskTotalMs, projectSessionMs, sessionNotes, staleSessions, needsDayCheck,
+  closedTodaySessions, dashboardTasks, liveMs, sessionMs, taskSessionMs, taskTotalMs, projectSessionMs, sessionNotes, staleSessions, needsDayCheck,
 } from '../src/client/lib/model.ts';
 import { dayKey } from '../src/client/lib/format.ts';
 import type { State } from '../src/shared/types.ts';
@@ -87,4 +87,18 @@ test('closedTodaySessions: only this task\'s sessions closed since midnight', ()
     { id: 'cb', taskId: 'b', openedAt: now - 5 * HOUR, closedAt: now - 4 * HOUR },
   );
   assert.deepEqual(closedTodaySessions(s, 'a', now).map((x) => x.id), ['c1', 'c2']);
+});
+
+test('dashboardTasks: ended-today tasks stay in place, earlier ones move to the end, newest first', () => {
+  const s = fixture();
+  s.tasks.push(
+    { id: 'c', projectId: 'p', name: 'C', status: 'finished', createdAt: 0, finishedAt: now - HOUR }, // today
+    { id: 'd', projectId: 'p', name: 'D', status: 'finished', createdAt: 0, finishedAt: yesterday - 24 * HOUR },
+    { id: 'e', projectId: 'p', name: 'E', status: 'finished', createdAt: 0, finishedAt: yesterday },
+    { id: 'f', projectId: 'p', name: 'F', status: 'finished', createdAt: 0 }, // no date: treat as long ago
+    { id: 'x', projectId: 'other', name: 'X', status: 'active', createdAt: 0 },
+  );
+  const { current, ended } = dashboardTasks(s, 'p', now);
+  assert.deepEqual(current.map((t) => t.id), ['a', 'b', 'c']);
+  assert.deepEqual(ended.map((t) => t.id), ['e', 'd', 'f']);
 });

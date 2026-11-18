@@ -89,13 +89,13 @@ export function History() {
       )}
 
       {finishedTasks.length > 0 && (
-        <FinishedList title="Finished tasks (in active projects)" items={finishedTasks.map((t) => ({
+        <FinishedList title="Ended tasks (in active projects)" items={finishedTasks.map((t) => ({
           id: t.id, label: `${project(s, t.projectId)?.name} › ${t.name}`, ms: taskTotalMs(s, t.id, serverNow()),
           reopen: () => run(() => api.tasks[':id'].reopen.$post({ param: { id: t.id } })),
         }))} />
       )}
       {finishedProjects.length > 0 && (
-        <FinishedList title="Finished projects" items={finishedProjects.map((p) => ({
+        <FinishedList title="Ended projects" items={finishedProjects.map((p) => ({
           id: p.id, label: p.name, ms: projectTotalMs(s, p.id, serverNow()),
           reopen: () => run(() => api.projects[':id'].reopen.$post({ param: { id: p.id } })),
         }))} />

@@ -4,13 +4,13 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
-  ActionIcon, Box, Button, Card, Divider, Group, Menu, Paper, SimpleGrid, Stack, Text, TextInput, Title, Tooltip,
+  ActionIcon, Badge, Box, Button, Card, Divider, Group, Menu, Paper, SimpleGrid, Stack, Text, TextInput, Title, Tooltip, UnstyledButton,
 } from '@mantine/core';
-import { IconCopy, IconDots, IconPlayerPlayFilled, IconPlayerStopFilled, IconPlus } from '@tabler/icons-react';
+import { IconCircleCheck, IconCopy, IconDots, IconPlayerPlayFilled, IconPlayerStopFilled, IconPlus } from '@tabler/icons-react';
 import type { Project, Task } from '../../shared/types.ts';
 import { api, copyText, serverNow, useAction, useS } from '../lib/api.ts';
 import {
-  closedTodaySessions, openSession, openSessions, openSessionsMs, project, projectSessionMs, projectTasks, projectTotalMs,
+  closedTodaySessions, dashboardTasks, openSession, openSessions, openSessionsMs, project, projectSessionMs, projectTotalMs,
   sessionMs, sessionNotes, task, taskSessionMs, taskTotalMs, whenLabel,
 } from '../lib/model.ts';
 import { clock, dayKey, fmtDate, fmtTime, hm } from '../lib/format.ts';
@@ -110,14 +110,14 @@ function ProjectCard({ project: p, onAddTime }: { project: Project; onAddTime: (
   const run = useAction();
   const [name, setName] = useState('');
   const [renaming, setRenaming] = useState(false);
-  const tasks = projectTasks(s, p.id).filter((t) => t.status === 'active');
-  const isLive = tasks.some((t) => s.running?.taskId === t.id);
+  const { current, ended } = dashboardTasks(s, p.id, serverNow());
+  const isLive = current.some((t) => s.running?.taskId === t.id);
   const addTask = async (e: FormEvent) => {
     e.preventDefault();
     if (name.trim() && await run(() => api.tasks.$post({ json: { projectId: p.id, name } }))) setName('');
   };
   const finish = () => {
-    if (confirm(`Finish project "${p.name}" and all its tasks?`)) run(() => api.projects[':id'].finish.$post({ param: { id: p.id } }));
+    if (confirm(`End project "${p.name}" and all its tasks?`)) run(() => api.projects[':id'].finish.$post({ param: { id: p.id } }));
   };
 
   return (
@@ -134,16 +134,17 @@ function ProjectCard({ project: p, onAddTime }: { project: Project; onAddTime: (
           </Menu.Target>
           <Menu.Dropdown>
             <Menu.Item onClick={() => setRenaming(true)}>Rename…</Menu.Item>
-            <Menu.Item disabled={!!s.pending} onClick={finish}>Finish project</Menu.Item>
+            <Menu.Item disabled={!!s.pending} onClick={finish}>End project</Menu.Item>
           </Menu.Dropdown>
         </Menu>
       </Group>
       <RenameModal opened={renaming} title="Rename project" name={p.name} onClose={() => setRenaming(false)}
         onSave={async (n) => !!(await run(() => api.projects[':id'].rename.$post({ param: { id: p.id }, json: { name: n } })))} />
       <Divider />
-      {tasks.length
-        ? tasks.map((t) => <TaskRow key={t.id} task={t} onAddTime={onAddTime} />)
-        : <Text size="sm" c="dimmed" px="md" py="sm">No active tasks</Text>}
+      {current.length
+        ? current.map((t) => <TaskRow key={t.id} task={t} onAddTime={onAddTime} />)
+        : <Text size="sm" c="dimmed" px="md" py="sm" style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>No active tasks</Text>}
+      <EndedTasks tasks={ended} />
       <form onSubmit={addTask}>
         <Group gap="xs" px="md" py="sm" wrap="nowrap">
           <TextInput size="sm" style={{ flex: 1 }} placeholder="Add a task…" value={name} onChange={(e) => setName(e.currentTarget.value)} />
@@ -181,10 +182,60 @@ function ClosedToday({ taskId }: { taskId: string }) {
   );
 }
 
+const ENDED_SHOWN = 5;
+
+/** Tasks ended before today: one summary line each, at the bottom of the project card. */
+function EndedTasks({ tasks }: { tasks: Task[] }) {
+  const [all, setAll] = useState(false);
+  if (!tasks.length) return null;
+  const shown = all ? tasks : tasks.slice(0, ENDED_SHOWN);
+  return (
+    <Box style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
+      {shown.map((t) => <EndedRow key={t.id} task={t} />)}
+      {tasks.length > ENDED_SHOWN && (
+        <UnstyledButton px="md" pb={6} onClick={() => setAll(!all)}>
+          <Text size="xs" c="dimmed" td="underline">{all ? 'Show fewer' : `Show ${tasks.length - ENDED_SHOWN} more ended`}</Text>
+        </UnstyledButton>
+      )}
+    </Box>
+  );
+}
+
+function EndedRow({ task: t }: { task: Task }) {
+  const s = useS();
+  const run = useAction();
+  const [renaming, setRenaming] = useState(false);
+  const id = { param: { id: t.id } };
+  return (
+    <Group px="md" py={4} gap="xs" wrap="nowrap">
+      <IconCircleCheck size={16} color="var(--mantine-color-dimmed)" style={{ flex: 'none' }} />
+      {/* Name first; the hours and date drop below it when there isn't room. */}
+      <Group gap={0} justify="space-between" style={{ flex: 1, columnGap: "var(--mantine-spacing-sm)" }} miw={0}>
+        <Text size="sm" c="dimmed" style={{ overflowWrap: 'anywhere' }}>{t.name}</Text>
+        <Text size="sm" c="dimmed" className="num" style={{ whiteSpace: 'nowrap' }}>
+          <b>{hm(taskTotalMs(s, t.id, serverNow()))}</b> · ended {t.finishedAt ? fmtDate(t.finishedAt) : '—'}
+        </Text>
+      </Group>
+      <Menu position="bottom-end" withinPortal>
+        <Menu.Target>
+          <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Ended task actions"><IconDots size={16} /></ActionIcon>
+        </Menu.Target>
+        <Menu.Dropdown>
+          <Menu.Item onClick={() => run(() => api.tasks[':id'].reopen.$post(id))}>Reopen task</Menu.Item>
+          <Menu.Item onClick={() => setRenaming(true)}>Rename…</Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+      <RenameModal opened={renaming} title="Rename task" name={t.name} onClose={() => setRenaming(false)}
+        onSave={async (n) => !!(await run(() => api.tasks[':id'].rename.$post({ ...id, json: { name: n } })))} />
+    </Group>
+  );
+}
+
 function TaskRow({ task: t, onAddTime }: { task: Task; onAddTime: (taskId: string) => void }) {
   const s = useS();
   const run = useAction();
   const running = s.running?.taskId === t.id;
+  const ended = t.status === 'finished'; // ended today: stays in place, greyed out, until tomorrow
   const busy = !!s.pending;
   const id = { param: { id: t.id } };
   const [renaming, setRenaming] = useState(false);
@@ -194,16 +245,19 @@ function TaskRow({ task: t, onAddTime }: { task: Task; onAddTime: (taskId: strin
       run(() => api.tasks[':id']['close-session'].$post(id));
     }
   };
-  const finish = () => {
-    if (confirm(`Finish task "${t.name}"? Its open session will be closed.`)) run(() => api.tasks[':id'].finish.$post(id));
+  const end = () => {
+    const open = openSession(s, t.id) || running ? ` Its session (${hm(taskSessionMs(s, t.id, serverNow()))}) will be closed.` : '';
+    if (confirm(`End task "${t.name}"?${open} It moves to the bottom of the project tomorrow.`)) run(() => api.tasks[':id'].finish.$post(id));
   };
 
   return (
     <Box px="md" py="sm" bg={running ? 'var(--mantine-color-green-light)' : undefined} style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
       <Group gap="sm" wrap="nowrap" align="flex-start">
-        <Text fw={500} style={{ flex: 1, overflowWrap: 'anywhere' }}>{t.name}</Text>
+        <Text fw={500} c={ended ? 'dimmed' : undefined} style={{ flex: 1, overflowWrap: 'anywhere' }}>
+          {t.name}{ended && <> <Badge size="sm" variant="light" color="gray" style={{ verticalAlign: 'middle' }}>Ended</Badge></>}
+        </Text>
         <Box ta="right">
-          <Text fz="xl" fw={700} lh={1.1} c={running ? 'green' : undefined} className="num" title="Current session">
+          <Text fz="xl" fw={700} lh={1.1} c={running ? 'green' : ended ? 'dimmed' : undefined} className="num" title="Current session">
             <Live>{(now) => clock(taskSessionMs(s, t.id, now))}</Live>
           </Text>
           <Text size="xs" c="dimmed" className="num">total <Live>{(now) => clock(taskTotalMs(s, t.id, now))}</Live></Text>
@@ -214,10 +268,13 @@ function TaskRow({ task: t, onAddTime }: { task: Task; onAddTime: (taskId: strin
         {running ? (
           <Button size="xs" color="red" disabled={busy} leftSection={<IconPlayerStopFilled size={14} />} onClick={() => run(() => api.stop.$post())}>Stop</Button>
         ) : (
-          <Button size="xs" color="green" disabled={busy} leftSection={<IconPlayerPlayFilled size={14} />}
+          <Button size="xs" color="green" disabled={busy || ended} leftSection={<IconPlayerPlayFilled size={14} />}
             onClick={() => run(() => api.tasks[':id'].start.$post({ ...id, json: {} }))}>Start</Button>
         )}
-        <Button size="xs" variant="default" disabled={busy} leftSection={<IconPlus size={14} />} onClick={() => onAddTime(t.id)}>Time</Button>
+        <Button size="xs" variant="default" disabled={busy || ended} leftSection={<IconPlus size={14} />} onClick={() => onAddTime(t.id)}>Time</Button>
+        <Button size="xs" variant="default" disabled={busy || ended} leftSection={<IconCircleCheck size={14} />} onClick={end}>
+          End
+        </Button>
         <Box style={{ flex: 1 }} />
         <Menu position="bottom-end" withinPortal>
           <Menu.Target>
@@ -225,8 +282,9 @@ function TaskRow({ task: t, onAddTime }: { task: Task; onAddTime: (taskId: strin
           </Menu.Target>
           <Menu.Dropdown>
             <Menu.Item onClick={() => setRenaming(true)}>Rename…</Menu.Item>
-            <Menu.Item disabled={busy || !openSession(s, t.id)} onClick={closeSession}>Close session</Menu.Item>
-            <Menu.Item disabled={busy} onClick={finish}>Finish task</Menu.Item>
+            {ended
+              ? <Menu.Item disabled={busy} onClick={() => run(() => api.tasks[':id'].reopen.$post(id))}>Reopen task</Menu.Item>
+              : <Menu.Item disabled={busy || !openSession(s, t.id)} onClick={closeSession}>Close session</Menu.Item>}
           </Menu.Dropdown>
         </Menu>
       </Group>

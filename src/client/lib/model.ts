@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Jon Gill
 
 // Derived values. Pure functions of (state, now) so they're easy to test.
-import type { State, Session, Stint } from '../../shared/types.ts';
+import type { State, Session, Stint, Task } from '../../shared/types.ts';
 import { dayKey, fmtDate, fmtTime } from './format.ts';
 
 export const project = (s: State, id: string) => s.projects.find((p) => p.id === id);
@@ -45,6 +45,20 @@ export const whenLabel = (t: number, now: number) => (dayKey(t) === dayKey(now) 
 /** A task's sessions closed today (oldest first): their totals still need entering on the platform. */
 export const closedTodaySessions = (s: State, tid: string, now: number) =>
   s.sessions.filter((x) => x.taskId === tid && x.closedAt && x.closedAt >= startOfDay(now)).sort((a, b) => a.closedAt! - b.closedAt!);
+
+/**
+ * A project's tasks as the dashboard shows them: active tasks and tasks ended today stay in place
+ * (creation order); tasks ended before today go to `ended`, most recently ended first.
+ */
+export function dashboardTasks(s: State, pid: string, now: number): { current: Task[]; ended: Task[] } {
+  const today = startOfDay(now);
+  const tasks = projectTasks(s, pid);
+  const endedEarlier = (t: Task) => t.status === 'finished' && (t.finishedAt ?? 0) < today;
+  return {
+    current: tasks.filter((t) => !endedEarlier(t)),
+    ended: tasks.filter(endedEarlier).sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0)),
+  };
+}
 
 /** Sessions opened before today that are still open. */
 export const staleSessions = (s: State, now: number) => openSessions(s).filter((x) => x.openedAt < startOfDay(now));

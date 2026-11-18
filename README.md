@@ -20,7 +20,9 @@ JSON file on your machine. No accounts, no database, no cloud.
   The next morning it offers to close yesterday's, and asks when a timer left running overnight really
   stopped.
 - **History:** every session and stint, filterable by project, exportable as CSV.
-- Rename or finish tasks and projects, reopen finished ones.
+- **End** a task when it's done: it stays in place (greyed out) for the rest of the day, then moves to the
+  bottom of its project as a one-line summary with its total hours and end date. Reopen it any time.
+- Rename tasks and projects; end whole projects (reopen them from History).
 - Works on a phone (layout tested down to 375px); several open tabs/devices stay in sync.
 
 ## Quick start
@@ -87,6 +89,7 @@ public internet.
   - Either way, time can't overlap time already recorded, be in the future, or exceed 24 hours.
 - **Next-day prompt:** on the first click or keypress of a new day, sessions left open from a previous day
   are offered for closing. A timer left running overnight asks when it really stopped.
+- **End** closes the task's session (asking for notes first if its timer is running).
 - Days roll over at local midnight. Copy buttons need HTTPS or localhost (otherwise a copy dialog appears).
 
 ## Development

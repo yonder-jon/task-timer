@@ -12,8 +12,8 @@ import { clock, fmtTime } from '../lib/format.ts';
 
 const TITLES: Record<Pending['action'], string> = {
   stop: 'Stint stopped',
-  finishTask: 'Finishing task',
-  finishProject: 'Finishing project',
+  finishTask: 'Ending task',
+  finishProject: 'Ending project',
   closeSession: 'Closing session',
 };
 
